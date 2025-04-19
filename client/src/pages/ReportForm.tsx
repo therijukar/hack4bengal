@@ -164,13 +164,46 @@ const ReportForm: React.FC = () => {
     setSubmitError(null);
     
     try {
-      // Mock API call - in a real app, you would send this to your backend
-      // const response = await axios.post('/api/report', values);
-      console.log('Form submitted with values:', values);
+      // Use FormData to handle file uploads
+      const formData = new FormData();
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Add text data
+      formData.append('incidentType', values.incidentType);
+      formData.append('description', values.incidentDescription);
+      formData.append('location', JSON.stringify(values.location));
+      formData.append('isAnonymous', String(values.isAnonymous));
       
+      if (!values.isAnonymous) {
+        formData.append('contactInfo', JSON.stringify(values.contactInfo));
+      }
+      
+      // Add media files
+      values.mediaFiles.forEach((file, index) => {
+        formData.append(`media`, file);
+      });
+      
+      // Get auth token if available
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {};
+      
+      // Only add Authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Real API call to the backend with FormData
+      const response = await fetch('http://localhost:3001/api/reports', {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit report');
+      }
+      
+      // Form submitted successfully
       setSubmitSuccess(true);
       console.log('Submit success set to true');
       
@@ -318,6 +351,7 @@ const ReportForm: React.FC = () => {
                   type="file"
                   multiple
                   hidden
+                  accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={(event) => {
                     const fileList = event.currentTarget.files;
                     if (fileList) {
@@ -326,6 +360,13 @@ const ReportForm: React.FC = () => {
                       // Check if total files would exceed limit
                       if (values.mediaFiles.length + newFiles.length > 5) {
                         alert('You can upload a maximum of 5 files');
+                        return;
+                      }
+                      
+                      // Check file sizes
+                      const oversizedFiles = newFiles.filter(file => file.size > 20 * 1024 * 1024);
+                      if (oversizedFiles.length > 0) {
+                        alert('Some files exceed the 20MB size limit');
                         return;
                       }
                       
@@ -582,12 +623,6 @@ const ReportForm: React.FC = () => {
                       color="primary"
                       type="submit"
                       disabled={isSubmitting}
-                      onClick={() => {
-                        console.log('Submit button clicked!');
-                        console.log('Form values:', formikProps.values);
-                        console.log('Form errors:', formikProps.errors);
-                        console.log('Is valid:', formikProps.isValid);
-                      }}
                     >
                       {isSubmitting ? 'Submitting...' : 'Submit Report'}
                     </Button>

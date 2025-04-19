@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Alert,
   Avatar,
@@ -30,27 +30,39 @@ const LoginSchema = Yup.object().shape({
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState('');
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const auth = useContext(AuthContext);
+  
+  // Get intended destination from location state or default to home/dashboard
+  const from = location.state?.from?.pathname || '/';
   
   // Check if already logged in
   useEffect(() => {
     if (auth.isAuthenticated() && !loginSuccess) {
       // Already logged in, redirect
       const isAdmin = auth.isSuperAdmin();
-      navigate(isAdmin ? '/dashboard' : '/');
+      const destination = isAdmin ? '/dashboard' : '/';
+      console.log(`Already authenticated, redirecting to ${destination}`);
+      navigate(destination, { replace: true });
     }
   }, [auth, navigate, loginSuccess]);
   
   const handleSubmit = async (values, { setSubmitting }) => {
+    // Prevent multiple submissions
+    if (isRedirecting) {
+      return;
+    }
+    
     setError('');
     
     try {
       console.log('Attempting login with:', values.email);
       
       // Make a real API call to the server
-      const response = await fetch('http://localhost:8080/api/auth/login', {
+      const response = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,6 +74,13 @@ const Login = () => {
       });
       
       console.log('Login response status:', response.status);
+      
+      // Handle non-JSON responses (e.g., server errors)
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server error: Invalid response format');
+      }
+      
       const data = await response.json();
       console.log('Login response data:', data);
       
@@ -69,23 +88,30 @@ const Login = () => {
         throw new Error(data.message || 'Login failed');
       }
       
+      if (!data.data?.user || !data.data?.token) {
+        throw new Error('Invalid response data from server');
+      }
+      
       // Use AuthContext login function to store user data
       auth.login(data.data.user, data.data.token);
       setLoginSuccess(true);
+      setIsRedirecting(true);
       
       // Wait a moment before redirecting to ensure state updates
       setTimeout(() => {
         // Redirect to dashboard for admins, or home for regular users
-        if (data.data.user.role === 'agency_admin' || data.data.user.role === 'admin') {
-          navigate('/dashboard');
-        } else {
-          navigate('/');
-        }
-      }, 100);
+        const redirectTo = data.data.user.role === 'admin' || data.data.user.role === 'agency_admin'
+          ? '/dashboard'
+          : from === '/login' ? '/' : from; // Avoid redirect loop
+        
+        console.log(`Login successful, redirecting to ${redirectTo}`);
+        navigate(redirectTo, { replace: true });
+      }, 500); // Increased from 100ms to 500ms
     } catch (err) {
       console.error('Login error details:', err);
       setError(err.message || 'Invalid email or password');
       console.error('Login error:', err);
+      setIsRedirecting(false);
     } finally {
       setSubmitting(false);
     }
@@ -167,9 +193,9 @@ const Login = () => {
                     fullWidth
                     variant="contained"
                     sx={{ mt: 3, mb: 2 }}
-                    disabled={isSubmitting || loginSuccess}
+                    disabled={isSubmitting || loginSuccess || isRedirecting}
                   >
-                    {isSubmitting ? 'Signing in...' : 'Sign In'}
+                    {isSubmitting || isRedirecting ? 'Signing in...' : 'Sign In'}
                   </Button>
                   <Grid container>
                     <Grid item xs>

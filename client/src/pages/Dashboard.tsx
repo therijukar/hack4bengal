@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   Box,
   Paper,
@@ -43,6 +43,8 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import TodayIcon from '@mui/icons-material/Today';
 import SendIcon from '@mui/icons-material/Send';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 
 // Fix Leaflet icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -401,6 +403,11 @@ const ReportDetail: React.FC<ReportDetailProps> = ({ report, onAssign }) => {
 
 // Main Dashboard component
 const Dashboard: React.FC = () => {
+  // Add authentication check
+  const auth = useContext(AuthContext);
+  const navigate = useNavigate();
+  
+  // Define all state hooks at the top level of the component
   const [tabValue, setTabValue] = useState(0);
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -409,15 +416,39 @@ const Dashboard: React.FC = () => {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [emergencyScoreFilter, setEmergencyScoreFilter] = useState<string>('all');
-
-  // Load mock data
+  
+  // Check if user is admin and redirect if not
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setReports(mockReports);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    if (!auth.loading && !auth.isSuperAdmin()) {
+      console.log('Unauthorized access to dashboard, redirecting');
+      navigate('/');
+    }
+  }, [auth, navigate]);
+  
+  // Load mock data - only fetch data if user is admin
+  useEffect(() => {
+    if (!auth.loading && auth.isSuperAdmin()) {
+      // Simulate API call
+      setTimeout(() => {
+        setReports(mockReports);
+        setLoading(false);
+      }, 1000);
+    }
+  }, [auth]);
+  
+  // If still loading, show a loading indicator
+  if (auth.loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+  
+  // If not admin, don't render anything (will be redirected by useEffect)
+  if (!auth.isSuperAdmin()) {
+    return null;
+  }
 
   // Handle tab change
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {

@@ -4,7 +4,8 @@ export interface User {
   email?: string;
   firstName?: string;
   lastName?: string;
-  role?: 'admin' | 'citizen';
+  role?: 'admin' | 'agency_admin' | 'agency_staff' | 'citizen';
+  agencyId?: string;
 }
 
 export interface AuthContextType {
@@ -14,4 +15,5 @@ export interface AuthContextType {
   logout: () => void;
   isSuperAdmin: () => boolean;
   isAuthenticated: () => boolean;
+  validateToken: () => Promise<User | null>;
 } 

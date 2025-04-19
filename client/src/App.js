@@ -5,6 +5,8 @@ import { Box, Container } from '@mui/material';
 // Import components
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import ProtectedRoute from './components/ProtectedRoute';
+import RoleRoute from './components/RoleRoute';
 
 // Import pages
 import Home from './pages/Home';
@@ -13,6 +15,8 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import NotFound from './pages/NotFound';
+import Unauthorized from './pages/Unauthorized';
+import UserProfile from './components/UserProfile';
 
 function App() {
   return (
@@ -20,11 +24,52 @@ function App() {
       <Navbar />
       <Container component="main" sx={{ flex: 1, py: 4 }}>
         <Routes>
+          {/* Public routes */}
           <Route path="/" element={<Home />} />
-          <Route path="/report" element={<ReportForm />} />
-          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          
+          {/* Authenticated routes */}
+          <Route 
+            path="/report-incident" 
+            element={
+              <ProtectedRoute>
+                <ReportForm />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <UserProfile />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* Role-restricted routes */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <RoleRoute allowedRoles={['admin', 'agency_admin', 'agency_staff']}>
+                <Dashboard />
+              </RoleRoute>
+            } 
+          />
+          
+          {/* Admin-only routes */}
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              <RoleRoute allowedRoles={['admin', 'agency_admin']}>
+                <Dashboard />
+              </RoleRoute>
+            } 
+          />
+          
+          {/* Catch-all route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Container>
